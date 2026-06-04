@@ -10,3 +10,4 @@
    `npm install`
 5. Run the app:
    `npm run dev`
+6. Open your web browser and navigate to `http://localhost:3000`. Your custom meeting suite is now live, fully integrated, and running locally!
