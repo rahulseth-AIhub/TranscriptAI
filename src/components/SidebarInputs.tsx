@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, ChangeEvent, DragEvent } from "react";
-import { PRESET_TRANSCRIPTS, PresetTranscript } from "../presets";
 import { 
   FileText, 
   Upload, 
@@ -32,7 +31,7 @@ export default function SidebarInputs({
   error,
   onJoinMeeting,
 }: SidebarInputsProps) {
-  const [activeTab, setActiveTab] = useState<"paste" | "presets" | "record-upload" | "calendar">("calendar");
+  const [activeTab, setActiveTab] = useState<"paste" | "record-upload" | "calendar">("calendar");
   
   // Paste states
   const [pasteText, setPasteText] = useState("");
@@ -57,12 +56,7 @@ export default function SidebarInputs({
     };
   }, []);
 
-  // Preset loader
-  const handleSelectPreset = (preset: PresetTranscript) => {
-    setPasteText(preset.transcript);
-    setTitleHint(preset.titleSuggestion);
-    setActiveTab("paste");
-  };
+
 
   // Drag and drop states
   const [dragActive, setDragActive] = useState(false);
@@ -237,10 +231,10 @@ export default function SidebarInputs({
       </div>
 
       {/* Tabs list */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+      <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
         <button
           onClick={() => setActiveTab("calendar")}
-          className={`py-1.5 px-2 text-[10px] md:text-xs font-bold rounded-lg transition-all duration-200 ${
+          className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all duration-200 ${
             activeTab === "calendar"
               ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
               : "text-zinc-600 dark:text-zinc-455 hover:text-zinc-955"
@@ -249,18 +243,8 @@ export default function SidebarInputs({
           Schedules 📅
         </button>
         <button
-          onClick={() => setActiveTab("presets")}
-          className={`py-1.5 px-2 text-[10px] md:text-xs font-bold rounded-lg transition-all duration-200 ${
-            activeTab === "presets"
-              ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-              : "text-zinc-600 dark:text-zinc-455 hover:text-zinc-955"
-          }`}
-        >
-          Scenario Examples
-        </button>
-        <button
           onClick={() => setActiveTab("paste")}
-          className={`py-1.5 px-2 text-[10px] md:text-xs font-bold rounded-lg transition-all duration-200 ${
+          className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all duration-200 ${
             activeTab === "paste"
               ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
               : "text-zinc-600 dark:text-zinc-455 hover:text-zinc-955"
@@ -270,7 +254,7 @@ export default function SidebarInputs({
         </button>
         <button
           onClick={() => setActiveTab("record-upload")}
-          className={`py-1.5 px-2 text-[10px] md:text-xs font-bold rounded-lg transition-all duration-200 ${
+          className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all duration-200 ${
             activeTab === "record-upload"
               ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
               : "text-zinc-600 dark:text-zinc-455 hover:text-zinc-955"
@@ -284,36 +268,6 @@ export default function SidebarInputs({
       <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         {activeTab === "calendar" && (
           <CalendarScheduler onJoinMeeting={onJoinMeeting} />
-        )}
-
-        {activeTab === "presets" && (
-          <div className="flex flex-col gap-4 animate-fade-in">
-            <div className="bg-zinc-50 dark:bg-zinc-850/50 p-3 rounded-lg border border-zinc-150 dark:border-zinc-800 flex items-start gap-3">
-              <Info className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                Choose any preset scenario to test the **structured intelligence engine**, including p99 latency debates, ARR updates, or security leaks.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3">
-              {PRESET_TRANSCRIPTS.map((preset) => (
-                <div
-                  key={preset.id}
-                  onClick={() => handleSelectPreset(preset)}
-                  className="group relative p-4 bg-white hover:bg-zinc-50 border border-zinc-100 hover:border-indigo-150 rounded-xl cursor-pointer transition-all duration-255 shadow-xs"
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="text-sm font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">
-                      {preset.name}
-                    </h3>
-                    <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
-                    {preset.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
         )}
 
         {activeTab === "paste" && (

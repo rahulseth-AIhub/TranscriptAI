@@ -1,22 +1,20 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/ec206097-45a2-4b67-9dd8-036c6ee25416
 
 ## Run Locally
 
 **Prerequisites:**  Node.js
 
-Run the Local Dev Server
 
-1. Create a .env file in the root directory by copying the example:
-
-      `cp .env.example .env`
-2. Open .env and assign your Gemini API Key:
-
-      `GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY"`
-3. Install package dependencies:
-
-      `npm install`
-
-4. Run the App:
-
-      `npm run dev`
-
-5. Open your web browser and navigate to `http://localhost:3000`. Your custom meeting suite is now live, fully integrated, and running locally!
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

@@ -25,43 +25,6 @@ interface ActiveMeetingRoomProps {
   isLoading: boolean;
 }
 
-// Dialog mock generators to simulate real-time discussions dynamically based on meeting topic
-const DEV_DIALOGS = [
-  "Sarah (PM): Hi team, thanks for dialing in. Let's review our roadmap for the database engine migration.",
-  "Dave (Principal Architect): Yes, our primary bottleneck is query scaling. We need to evaluate Redis vs. PostgreSQL caching.",
-  "Mark (Lead Engineer): Honestly, at 150k operations per second, relational schemas are a massive bottleneck.",
-  "Amanda (DevOps): Speaking from deployment, Amazon RDS handles our scaling nicely but the indexing spikes are real.",
-  "Dave: If we offload the writes using Kafka buffering, that mitigates the locking concerns.",
-  "Mark: Kafka connectors will look complex, who will configure the stress testers?",
-  "Amanda: I can spin up the Kafka containers in sandbox by next Tuesday."
-];
-
-const SALES_DIALOGS = [
-  "Elena (VP Sales): Welcome everyone. Today we are looking at our business forecasting and conversion metrics.",
-  "Jared (Director Growth): Checkout conversion rose from 1.8% to 2.45% thanks to the quick checkout feature.",
-  "Elena: That is superb. However we have mid-market churn. Acme and Globex want to downscale licenses.",
-  "Chloe (CS Lead): Globex is demanding custom SLAs and webhook retries because of rate limits.",
-  "Jared: Let's assign an engineer directly to onboard their support patch.",
-  "Chloe: I will schedule a deep-dive call with their technical manager tomorrow to restore alignment."
-];
-
-const SECURITY_DIALOGS = [
-  "Robert (CISO): Let's start the RCA for INC-402 database permissions over-allocation.",
-  "Lisa (SecOps): AWS GuardDuty flagged wildcard permissions on dev sandbox at 23:45 UTC. We revoked the key pair within 4 minutes.",
-  "Ken (Engineering Manager): Our policies explicitly forbid manual wildcard generation on non-isolated targets.",
-  "Lisa: The automated cloud sweeps had a timing hole because of Terraform tests.",
-  "Robert: Do we have personal data leak risks?",
-  "Ken: The staging backup only contained anonymous random strings, so zero PII exposure."
-];
-
-const GENERAL_DIALOGS = [
-  "Alice (Meeting Chair): Welcome everyone. Let's align on current project timelines and deliverables.",
-  "Bob (Tech Lead): Mostly green on the sprint schedule except for the payment webhook regression.",
-  "Charlie (Product Owner): What's our timeline on resolving the gatekeeper bugs?",
-  "Bob: We have a fix ready for QA review. I will deploy it by Tuesday morning.",
-  "Alice: Excellent. Let's make sure our release notes get published on time."
-];
-
 export default function ActiveMeetingRoom({
   event,
   onConclude,
@@ -70,30 +33,19 @@ export default function ActiveMeetingRoom({
 }: ActiveMeetingRoomProps) {
   const [conferencingTime, setConferencingTime] = useState(0);
   const [isCapturing, setIsCapturing] = useState(true);
-  const [useSimulation, setUseSimulation] = useState(true);
   const [transcriptLines, setTranscriptLines] = useState<string[]>([]);
   const [customLine, setCustomLine] = useState("");
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
 
-  const simulationIndexRef = useRef(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const feedIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const isSpeechActiveRef = useRef(false);
+  const timeRef = useRef(conferencingTime);
 
-  // Determine which dialogue array to use based on meeting topic
-  const getSimulatedDialogues = () => {
-    const title = (event.summary || "").toLowerCase();
-    if (title.includes("route") || title.includes("tech") || title.includes("db") || title.includes("database")) {
-      return DEV_DIALOGS;
-    }
-    if (title.includes("sales") || title.includes("qbr") || title.includes("arr") || title.includes("business")) {
-      return SALES_DIALOGS;
-    }
-    if (title.includes("inc") || title.includes("security") || title.includes("breach") || title.includes("leak") || title.includes("aws")) {
-      return SECURITY_DIALOGS;
-    }
-    return GENERAL_DIALOGS;
-  };
-
-  const dialogues = getSimulatedDialogues();
+  // Sync conferencing time with ref to keep callback synchronized without restarts
+  useEffect(() => {
+    timeRef.current = conferencingTime;
+  }, [conferencingTime]);
 
   // 1. Core Timer Setup
   useEffect(() => {
@@ -106,50 +58,74 @@ export default function ActiveMeetingRoom({
     };
   }, []);
 
-  // 2. Automated Dialogue Simulation Setup
+  // Initialize transcript list with a starting guide line
   useEffect(() => {
-    if (isCapturing && useSimulation) {
-      // First line immediately
-      if (transcriptLines.length === 0) {
-        setTranscriptLines([
-          `[00:00:01] ${dialogues[0] || "Organizer: Meeting session started."}`
-        ]);
-        simulationIndexRef.current = 1;
-      }
+    setTranscriptLines([
+      `[00:00:01] System: Bridge connected. Speak clearly or type manual lines below.`
+    ]);
+  }, []);
 
-      feedIntervalRef.current = setInterval(() => {
-        const nextIdx = simulationIndexRef.current;
-        if (nextIdx < dialogues.length) {
-          const timestamp = formatSeconds(conferencingTime);
-          setTranscriptLines((prev) => [
-            ...prev,
-            `[${timestamp}] ${dialogues[nextIdx]}`
-          ]);
-          simulationIndexRef.current = nextIdx + 1;
-        } else {
-          // Loop with variation
-          const timestamp = formatSeconds(conferencingTime);
-          const randPerson = ["Sarah", "Dave", "Alice", "Mark", "Chloe", "Amanda"][Math.floor(Math.random() * 6)];
-          const genericComments = [
-            "Let's confirm and assign this item properly.",
-            "I agree with that resolution strategy.",
-            "Let's write a concrete roadmap item for Q3.",
-            "Any other perspectives on this before we wrap up?",
-            "Uptime looks correct, let's deploy the check is complete."
-          ];
-          const comment = genericComments[Math.floor(Math.random() * genericComments.length)];
-          setTranscriptLines((prev) => [
-            ...prev,
-            `[${timestamp}] ${randPerson}: ${comment}`
-          ]);
+  // 2. Speech-to-Text Recognition Setup
+  useEffect(() => {
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      setIsSpeechSupported(true);
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+
+      rec.onresult = (event: any) => {
+        const result = event.results[event.results.length - 1];
+        if (result.isFinal) {
+          const text = result[0].transcript.trim();
+          if (text) {
+            const timestamp = formatSeconds(timeRef.current);
+            setTranscriptLines((prev) => [
+              ...prev,
+              `[${timestamp}] User: ${text}`
+            ]);
+          }
         }
-      }, 5000); // dialogue line every 5 seconds
-    }
+      };
 
-    return () => {
-      if (feedIntervalRef.current) clearInterval(feedIntervalRef.current);
-    };
-  }, [isCapturing, useSimulation, conferencingTime]);
+      rec.onend = () => {
+        if (isSpeechActiveRef.current) {
+          try {
+            rec.start();
+          } catch (e) {
+            console.warn("Speech recognition restart failed:", e);
+          }
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  // 3. Keep speech recognition active while isCapturing is true
+  useEffect(() => {
+    if (!recognitionRef.current) return;
+    if (isCapturing) {
+      isSpeechActiveRef.current = true;
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.warn("Failed to start speech recognition:", e);
+      }
+    } else {
+      isSpeechActiveRef.current = false;
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn("Failed to stop speech recognition:", e);
+      }
+    }
+  }, [isCapturing]);
 
   const formatSeconds = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60).toString().padStart(2, "0");
@@ -234,12 +210,14 @@ export default function ActiveMeetingRoom({
         </div>
       </div>
 
-      {/* Simulator Control Center */}
+      {/* Track Controls */}
       <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <span className="text-xs font-bold text-zinc-800 block mb-1">Bridge Audio Tracking</span>
+          <span className="text-xs font-bold text-zinc-805 block mb-1">Bridge Audio Tracking</span>
           <p className="text-[11px] text-zinc-500 leading-normal mb-2">
-            TranscriptAI automatically captures browser meeting dialogues. Toggle feed controls below:
+            {isSpeechSupported 
+              ? "TranscriptAI will transcribe your microphone audio in real-time. Use the capture toggle to start/pause tracking."
+              : "Microphone recording is ready. Type manual dialog lines below to construct meeting minutes."}
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -247,7 +225,7 @@ export default function ActiveMeetingRoom({
               onClick={() => setIsCapturing(!isCapturing)}
               className={`flex items-center gap-1.5 py-1.5 px-3 text-xs font-bold rounded-lg border transition-all ${
                 isCapturing 
-                  ? "bg-indigo-50 border-indigo-105 text-indigo-700 hover:bg-indigo-100" 
+                  ? "bg-indigo-50 border-indigo-150 text-indigo-700 hover:bg-indigo-100" 
                   : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
             >
@@ -262,16 +240,11 @@ export default function ActiveMeetingRoom({
               )}
             </button>
 
-            <button
-              onClick={() => setUseSimulation(!useSimulation)}
-              className={`flex items-center gap-1.5 py-1.5 px-3 text-xs font-bold rounded-lg border transition-all ${
-                useSimulation 
-                  ? "bg-amber-50 border-amber-105 text-amber-700 hover:bg-amber-100" 
-                  : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-              }`}
-            >
-              {useSimulation ? "Switch to Manual Captions" : "Enable AI Auto-Voice"}
-            </button>
+            <span className={`inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+              isSpeechSupported ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"
+            }`}>
+              {isSpeechSupported ? "🎙️ Real-time STT" : "✍️ Manual Feed Only"}
+            </span>
           </div>
         </div>
 
