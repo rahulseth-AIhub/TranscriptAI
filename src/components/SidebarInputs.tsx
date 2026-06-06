@@ -11,7 +11,8 @@ import {
   Info,
   CheckCircle,
   AlertCircle,
-  Calendar
+  Calendar,
+  Download
 } from "lucide-react";
 import CalendarScheduler from "./CalendarScheduler";
 import { CalendarEvent } from "../firebase_client";
@@ -129,6 +130,18 @@ export default function SidebarInputs({
     }
   };
 
+  const handleDownloadAudio = () => {
+    if (audioUrl) {
+      const a = document.createElement("a");
+      a.href = audioUrl;
+      const cleanTitle = titleHint.trim() ? titleHint.trim().replace(/[^a-zA-Z0-9]/g, "_") : "recorded_session";
+      a.download = `${cleanTitle}_${new Date().toISOString().replace(/[:.]/g, "-")}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   // Handle local text file load
   const loadTextFile = (file: File) => {
     const reader = new FileReader();
@@ -219,7 +232,7 @@ export default function SidebarInputs({
   };
 
   return (
-    <div className="flex flex-col gap-5 h-full bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-6 overflow-hidden">
+    <div className="flex flex-col gap-5 h-full bg-white dark:bg-black rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-6 overflow-hidden">
       <div className="flex flex-col gap-2">
         <h2 className="font-display text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400 animate-pulse" />
@@ -282,7 +295,7 @@ export default function SidebarInputs({
                 placeholder="e.g., Q3 Planning Session, Database RFC review"
                 value={titleHint}
                 onChange={(e) => setTitleHint(e.target.value)}
-                className="w-full text-sm py-1.5 px-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-hidden focus:border-indigo-500 dark:bg-zinc-850 text-zinc-905"
+                className="w-full text-sm py-1.5 px-3 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg focus:outline-hidden focus:border-indigo-500 text-zinc-900 dark:text-zinc-100"
               />
             </div>
 
@@ -305,7 +318,7 @@ export default function SidebarInputs({
 [00:02:10] Bob: I'll handle that index."
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                className="w-full flex-1 p-3 text-xs leading-relaxed border border-zinc-200 dark:border-zinc-700 rounded-lg font-mono focus:outline-hidden focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-850 text-zinc-900 resize-none min-h-0"
+                className="w-full flex-1 p-3 text-xs leading-relaxed border border-zinc-200 dark:border-zinc-700 rounded-lg font-mono focus:outline-hidden focus:border-indigo-500 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 resize-none min-h-0"
               />
             </div>
           </div>
@@ -314,7 +327,7 @@ export default function SidebarInputs({
         {activeTab === "record-upload" && (
           <div className="flex flex-col gap-4 animate-fade-in">
             {/* Topic Hint */}
-            <div className="flex flex-col gap-1.55">
+            <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Meeting Topic (Optional Hint)
               </label>
@@ -323,19 +336,19 @@ export default function SidebarInputs({
                 placeholder="e.g., Live Sync Meeting"
                 value={titleHint}
                 onChange={(e) => setTitleHint(e.target.value)}
-                className="w-full text-sm py-1.5 px-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-hidden focus:border-indigo-500 dark:bg-zinc-850 text-zinc-905"
+                className="w-full text-sm py-1.5 px-3 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg focus:outline-hidden focus:border-indigo-500 text-zinc-900 dark:text-zinc-100"
               />
             </div>
 
             {/* Option A: Microphone Recording */}
-            <div className="p-4 border border-zinc-150 rounded-xl flex flex-col items-center justify-center gap-3 bg-zinc-50">
-              <span className="text-xs font-semibold text-zinc-750">Option A: Live Voice Recorder</span>
+            <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-900/40">
+              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Option A: Live Voice Recorder</span>
               
               {isRecording ? (
                 <div className="flex flex-col items-center gap-2">
                   {/* Glowing record indicator */}
-                  <div className="flex items-center gap-2 py-1 px-3 bg-red-50 text-red-600 rounded-full text-xs font-mono animate-pulse border border-red-150">
-                    <div className="h-2 w-2 rounded-full bg-red-650"></div>
+                  <div className="flex items-center gap-2 py-1 px-3 bg-red-50 dark:bg-red-950/25 text-red-600 dark:text-red-400 rounded-full text-xs font-mono animate-pulse border border-red-150 dark:border-red-900/30">
+                    <div className="h-2 w-2 rounded-full bg-red-600"></div>
                     RECORDING LIVE • {formatTime(recordingDuration)}
                   </div>
                   
@@ -359,19 +372,19 @@ export default function SidebarInputs({
                 <div className="flex flex-col items-center gap-2">
                   <button
                     onClick={startRecording}
-                    className="h-12 w-12 rounded-full bg-indigo-605 text-white flex items-center justify-center hover:bg-indigo-700 shadow-md transform hover:scale-105 active:scale-95 transition-all"
+                    className="h-12 w-12 rounded-full bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 shadow-md transform hover:scale-105 active:scale-95 transition-all"
                   >
                     <Mic className="h-5 w-5" />
                   </button>
-                  <span className="text-[10px] text-zinc-500 font-medium">Click to capture browser audio</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Click to capture browser audio</span>
                 </div>
               )}
 
               {/* Recorded playback element */}
               {audioUrl && !isRecording && (
-                <div className="w-full flex flex-col gap-2 mt-2 bg-white rounded-lg p-2.5 border border-zinc-150">
+                <div className="w-full flex flex-col gap-2.5 mt-2 bg-white dark:bg-zinc-900 rounded-lg p-2.5 border border-zinc-200 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-zinc-800 flex items-center gap-1">
+                    <span className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1">
                       <CheckCircle className="h-3 w-3 text-green-500" /> Action Ready: Recorded clip
                     </span>
                     <span className="text-[10px] font-mono text-zinc-400">
@@ -379,15 +392,22 @@ export default function SidebarInputs({
                     </span>
                   </div>
                   <audio src={audioUrl} controls className="w-full h-8" />
+                  <button
+                    type="button"
+                    onClick={handleDownloadAudio}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 mt-1 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-100 dark:border-indigo-900/40 text-indigo-700 dark:text-indigo-400 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download Recorded Audio (.webm)
+                  </button>
                 </div>
               )}
             </div>
 
             {/* Split lines */}
             <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-zinc-150"></div>
+              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
               <span className="flex-shrink mx-3 text-[10px] font-bold text-zinc-400 uppercase">OR</span>
-              <div className="flex-grow border-t border-zinc-150"></div>
+              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
             </div>
 
             {/* Option B: Direct Document/Audio Upload */}
@@ -398,21 +418,21 @@ export default function SidebarInputs({
               onDrop={handleDrop}
               className={`p-5 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 text-center transition-all ${
                 dragActive 
-                  ? "border-indigo-500 bg-indigo-50/20" 
-                  : "border-zinc-200 hover:border-zinc-300 bg-zinc-50"
+                  ? "border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/25" 
+                  : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/40"
               }`}
             >
-              <Upload className="h-6 w-6 text-zinc-400" />
+              <Upload className="h-6 w-6 text-zinc-400 dark:text-zinc-500" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-semibold text-zinc-800">
+                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
                   Drag & Drop Document / Audio
                 </span>
-                <span className="text-[10px] text-zinc-400 leading-relaxed max-w-[200px] mx-auto">
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 leading-relaxed max-w-[200px] mx-auto">
                   Supports .txt, .md, or typical voice formats e.g., mp3, wav. Max size: 10MB
                 </span>
               </div>
               
-              <label className="mt-1 cursor-pointer py-1 px-3 bg-white border border-zinc-200 rounded-lg text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 shadow-xs transition-colors">
+              <label className="mt-1 cursor-pointer py-1 px-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 shadow-xs transition-colors">
                 Browse Files
                 <input
                   type="file"
@@ -424,19 +444,19 @@ export default function SidebarInputs({
 
               {/* Uploaded file status */}
               {uploadedFile && (
-                <div className="w-full mt-2 bg-indigo-50 border border-indigo-100 rounded-lg p-2 flex items-center justify-between text-left">
+                <div className="w-full mt-2 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 rounded-lg p-2 flex items-center justify-between text-left">
                   <div className="flex items-center gap-2 shrink-0 min-w-0">
-                    <FileText className="h-4 w-4 text-indigo-500" />
+                    <FileText className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
                     <div className="shrink min-w-0">
-                      <p className="text-[11px] font-semibold text-indigo-950 truncate max-w-[140px]">
+                      <p className="text-[11px] font-semibold text-indigo-950 dark:text-indigo-200 truncate max-w-[140px]">
                         {uploadedFile.name}
                       </p>
-                      <p className="text-[9px] text-indigo-400 font-mono">
+                      <p className="text-[9px] text-indigo-400 dark:text-indigo-500 font-mono">
                         {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
                   </div>
-                  <span className="text-[9px] bg-indigo-200/55 text-indigo-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
+                  <span className="text-[9px] bg-indigo-200/55 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
                     Loaded
                   </span>
                 </div>

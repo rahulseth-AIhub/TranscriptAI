@@ -55,8 +55,8 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
 
   if (!markdown) return result;
 
-  // Split section content by '## ' headings
-  const sections = markdown.split(/\n##\s+/);
+  // Split section content by headings (using positive lookahead for flexible symbols or words)
+  const sections = markdown.split(/\n(?:#+\s+)?(?=📌|📝|🔑|✅|💡|⏳|Meeting\s+Metadata|Executive\s+Summary|Key\s+Discussion\s+Pillars|Action\s+Items|Decisions,\s+Blocks,\s+&\s+Risks|Quick-Reference\s+Timeline)/i);
 
   sections.forEach((sect) => {
     // Trim and normalize headings
@@ -66,10 +66,10 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
 
     // Check headings (resilient to exact icons/emojis/capitalization)
     if (headingLine.includes("Metadata") || headingLine.includes("📌")) {
-      // Parse metadata lines
-      const topicMatch = contentBody.match(/\*\*Meeting Topic:\*\*\s*(.*)/i);
-      const dateMatch = contentBody.match(/\*\*Date\/Time:\*\*\s*(.*)/i);
-      const attendeeMatch = contentBody.match(/\*\*Attendees:\*\*\s*(.*)/i);
+      // Parse metadata lines (resilient to bold or dry labels)
+      const topicMatch = contentBody.match(/(?:\*\*Meeting Topic:\*\*|Meeting Topic:)\s*(.*)/i);
+      const dateMatch = contentBody.match(/(?:\*\*Date\/Time:\*\*|Date\/Time:)\s*(.*)/i);
+      const attendeeMatch = contentBody.match(/(?:\*\*Attendees:\*\*|Attendees:)\s*(.*)/i);
 
       if (topicMatch) result.metadata.topic = topicMatch[1].trim();
       if (dateMatch) result.metadata.dateTime = dateMatch[1].trim();
@@ -84,8 +84,8 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
     } else if (headingLine.includes("Summary") || headingLine.includes("📝")) {
       result.summary = contentBody.replace(/\*/g, "").trim();
     } else if (headingLine.includes("Pillars") || headingLine.includes("🔑")) {
-      // Split by '### ' for each pillar
-      const pillarBlocks = contentBody.split(/\n###\s+/);
+      // Split by '### ' or numbered style '1. ', '2. '
+      const pillarBlocks = contentBody.split(/\n(?=(?:###\s+)?\d+\.[^\n]+)/);
       pillarBlocks.forEach((block) => {
         const blLines = block.split("\n");
         let title = blLines[0].trim();
@@ -93,7 +93,7 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
         if (!title || title.startsWith("*")) return;
 
         // Strip index prefix e.g., "1. NexaRoute Stack" to "NexaRoute Stack"
-        const indexMatch = title.match(/^(\d+)[.\s]+(.*)/);
+        const indexMatch = title.match(/^(?:###\s+)?(\d+)[.\s]+(.*)/);
         let index = result.pillars.length + 1;
         if (indexMatch) {
           index = parseInt(indexMatch[1]);
@@ -102,9 +102,9 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
 
         const remainingContent = blLines.slice(1).join("\n");
 
-        const contextMatch = remainingContent.match(/\*\*Context:\*\*\s*(.*)/i);
-        const permMatch = remainingContent.match(/\*\*Perspectives:\*\*\s*(.*)/i);
-        const resMatch = remainingContent.match(/\*\*(?:Resolution\/Outcome|Outcome):\*\*\s*(.*)/i);
+        const contextMatch = remainingContent.match(/(?:\*\*Context:\*\*|Context:)\s*(.*)/i);
+        const permMatch = remainingContent.match(/(?:\*\*Perspectives:\*\*|Perspectives:)\s*(.*)/i);
+        const resMatch = remainingContent.match(/(?:\*\*(?:Resolution\/Outcome|Outcome):\*\*|(?:Resolution\/Outcome|Outcome):)\s*(.*)/i);
 
         result.pillars.push({
           index,
@@ -115,14 +115,13 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
         });
       });
     } else if (headingLine.includes("Action Items") || headingLine.includes("✅")) {
-      // Parse checkboxes: * [ ] **Owner**: Task details
       const itemLines = contentBody.split("\n");
       itemLines.forEach((l, idx) => {
         const trimmed = l.trim();
         if (!trimmed) return;
 
-        // Try Owner pattern: * [ ] **Owner**: task description
-        const ownerTaskMatch = trimmed.match(/^\*?\s*\[\s*[x ]\s*\]\s*\*\*([^*]+)\*\*:\s*(.*)/i);
+        // Match checkbox format with optional quotes, bold, or plain owners
+        const ownerTaskMatch = trimmed.match(/^\*?\s*\[\s*[x ]\s*\]\s*(?:\*\*|")?([^"*:\]]+?)(?:\*\*|")?[：:]\s*(.*)/i);
         if (ownerTaskMatch) {
           result.actionItems.push({
             id: `action-${idx}`,
@@ -134,24 +133,12 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
           // Broad checkbox fallback
           const broadMatch = trimmed.match(/^\*?\s*\[\s*[x ]\s*\]\s*(.*)/i);
           if (broadMatch) {
-            const splitColon = broadMatch[1].split(":");
-            if (splitColon.length > 1 && splitColon[0].startsWith("**") && splitColon[0].endsWith("**")) {
-              const owner = splitColon[0].replace(/\*/g, "").trim();
-              const task = splitColon.slice(1).join(":").trim();
-              result.actionItems.push({
-                id: `action-${idx}`,
-                owner,
-                task,
-                completed: trimmed.toLowerCase().includes("[x]"),
-              });
-            } else {
-              result.actionItems.push({
-                id: `action-${idx}`,
-                owner: "Team/Unassigned",
-                task: broadMatch[1].trim(),
-                completed: trimmed.toLowerCase().includes("[x]"),
-              });
-            }
+            result.actionItems.push({
+              id: `action-${idx}`,
+              owner: "Team/Unassigned",
+              task: broadMatch[1].trim(),
+              completed: trimmed.toLowerCase().includes("[x]"),
+            });
           }
         }
       });

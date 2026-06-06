@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { CalendarEvent } from "../firebase_client";
+import { exportRawTranscriptToPDF } from "../utils/pdfGenerator";
 import { 
   Users, 
   Clock, 
@@ -15,7 +16,8 @@ import {
   Volume2,
   CheckSquare,
   Activity,
-  Send
+  Send,
+  Download
 } from "lucide-react";
 
 interface ActiveMeetingRoomProps {
@@ -36,6 +38,8 @@ export default function ActiveMeetingRoom({
   const [transcriptLines, setTranscriptLines] = useState<string[]>([]);
   const [customLine, setCustomLine] = useState("");
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const [isSpeechBlocked, setIsSpeechBlocked] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
@@ -101,6 +105,28 @@ export default function ActiveMeetingRoom({
 
       rec.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          setIsSpeechBlocked(true);
+          setSpeechError("Microphone permission was denied by the browser. Real-time translation is disabled.");
+          setIsCapturing(false);
+          isSpeechActiveRef.current = false;
+          
+          setTranscriptLines((prev) => {
+            if (prev.some(line => line.includes("System Error: Failed to access microphone"))) {
+              return prev;
+            }
+            return [
+              ...prev,
+              `[00:00:01] System Error: Failed to access microphone (Permission Denied). Please use manual injection form below to capture dialogues.`
+            ];
+          });
+
+          try {
+            rec.stop();
+          } catch (err) {
+            // ignore
+          }
+        }
       };
 
       recognitionRef.current = rec;
@@ -109,7 +135,7 @@ export default function ActiveMeetingRoom({
 
   // 3. Keep speech recognition active while isCapturing is true
   useEffect(() => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current || isSpeechBlocked) return;
     if (isCapturing) {
       isSpeechActiveRef.current = true;
       try {
@@ -125,7 +151,7 @@ export default function ActiveMeetingRoom({
         console.warn("Failed to stop speech recognition:", e);
       }
     }
-  }, [isCapturing]);
+  }, [isCapturing, isSpeechBlocked]);
 
   const formatSeconds = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60).toString().padStart(2, "0");
@@ -161,12 +187,22 @@ export default function ActiveMeetingRoom({
       
       {/* HUD Header */}
       <div className="flex flex-wrap items-center justify-between border-b border-zinc-150 pb-4 gap-3">
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1.5 py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold rounded-lg shadow-inner transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to Schedules
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-1.5 py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold rounded-lg shadow-inner transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Schedules
+          </button>
+          
+          <button
+            onClick={() => exportRawTranscriptToPDF(event.summary || "Live Session", transcriptLines.join("\n"))}
+            disabled={transcriptLines.length === 0}
+            className="flex items-center gap-1.5 py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-semibold rounded-lg transition-colors shadow-sm"
+          >
+            <Download className="h-3.5 w-3.5 text-indigo-600" /> Save Transcript PDF
+          </button>
+        </div>
 
         <div className="flex items-center gap-1.5 py-1 px-2.5 bg-indigo-50 text-indigo-700 rounded-full font-mono text-[11px] font-bold border border-indigo-100 animate-pulse">
           <Activity className="h-3.5 w-3.5" />
@@ -213,20 +249,35 @@ export default function ActiveMeetingRoom({
       {/* Track Controls */}
       <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <span className="text-xs font-bold text-zinc-805 block mb-1">Bridge Audio Tracking</span>
-          <p className="text-[11px] text-zinc-500 leading-normal mb-2">
-            {isSpeechSupported 
-              ? "TranscriptAI will transcribe your microphone audio in real-time. Use the capture toggle to start/pause tracking."
-              : "Microphone recording is ready. Type manual dialog lines below to construct meeting minutes."}
-          </p>
+          <span className="text-xs font-bold text-zinc-800 block mb-1">Bridge Audio Tracking</span>
+          
+          {isSpeechBlocked ? (
+            <div className="mb-3 p-2.5 bg-red-50 border border-red-150 rounded-lg text-[11px] text-red-800 leading-normal flex items-start gap-1.5">
+              <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Microphone Access Denied:</strong> Real-time Speech-to-Text is disabled. Please grant microphone permissions in your browser bar, or inject dialogues manually using the chat form below.
+              </span>
+            </div>
+          ) : isSpeechSupported ? (
+            <p className="text-[11px] text-zinc-500 leading-normal mb-2">
+              TranscriptAI will transcribe your microphone audio in real-time. Use the capture toggle to start/pause tracking.
+            </p>
+          ) : (
+            <p className="text-[11px] text-zinc-500 leading-normal mb-2">
+              Microphone recording is ready. Type manual dialog lines below to construct meeting minutes.
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setIsCapturing(!isCapturing)}
+              disabled={isSpeechBlocked}
               className={`flex items-center gap-1.5 py-1.5 px-3 text-xs font-bold rounded-lg border transition-all ${
-                isCapturing 
-                  ? "bg-indigo-50 border-indigo-150 text-indigo-700 hover:bg-indigo-100" 
-                  : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+                isSpeechBlocked
+                  ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed"
+                  : isCapturing 
+                    ? "bg-indigo-50 border-indigo-150 text-indigo-700 hover:bg-indigo-100" 
+                    : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
             >
               {isCapturing ? (
