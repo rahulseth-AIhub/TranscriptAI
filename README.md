@@ -1,12 +1,7 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/ec206097-45a2-4b67-9dd8-036c6ee25416
+- Implement dark mode with persistent storage
+- Add `jspdf` dependency for future export capabilities
+- Improve markdown section parsing resilience for metadata and headings
+- Update documentation and cleanup imports
 
 ## Run Locally
 
