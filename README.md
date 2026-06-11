@@ -15,6 +15,12 @@
 - Improve markdown section parsing resilience for metadata and headings
 - Update documentation and cleanup imports
 
+##Whats need Improvements:
+
+- Google canlender sync is available for limited number of manually invited users.
+- Does not allow Multiple file upload
+
+
 ##RUN Online
 
 https://transcriptai-2886744896.asia-southeast1.run.app/
