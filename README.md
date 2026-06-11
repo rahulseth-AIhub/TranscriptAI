@@ -1,20 +1,15 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+- Implement dark mode with persistent storage
+- Add `jspdf` dependency for future export capabilities
+- Improve markdown section parsing resilience for metadata and headings
+- Update documentation and cleanup imports
 
-# Run and deploy your AI Studio app
+##Run Locally
 
-This contains everything you need to run your app locally.
+**Prerequisites:** Node.js
 
-View your app in AI Studio: https://ai.studio/apps/ec206097-45a2-4b67-9dd8-036c6ee25416
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Copy the repo locally
+2. Make a copy of .env.example to .env `cp .env.example .env`
+3. Set the `GEMINI_API_KEY` in [.env](.env) to your Gemini API key
+4. Install dependencies: `npm install`
+5. Run the app: `npm run dev`
+6. Open your web browser and navigate to `http://localhost:3000`. Your custom meeting suite is now live, fully integrated, and running locally!
