@@ -39,4 +39,4 @@ https://transcriptai-2886744896.asia-southeast1.run.app/
 - Generate: Hit the "Analyze with TranscriptAI" button and watch the report appear.
 
 💡 Pro-Tip:
-If you run into an error (like a rate limit or "model not found"), just use the dropdown menu to switch the AI model (e.g., try Gemini 3.5 Flash or Gemini 2.5 Flash) and try again.
+If you run into an error (like a rate limit or "model not found"), just use the dropdown menu to switch to a different AI model and try again.
