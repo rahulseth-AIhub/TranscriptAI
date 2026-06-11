@@ -37,5 +37,6 @@ https://transcriptai-2886744896.asia-southeast1.run.app/
 - Get a Gemini API Key: It’s completely free! Go to https://aistudio.google.dev/app/apikey and click "Create API Key."
 - Select Sources: Either record live or upload recorded audio (m4a, mp3, wav) or text files (Zoom/Teams transcripts).
 - Generate: Hit the "Analyze with TranscriptAI" button and watch the report appear.
+
 💡 Pro-Tip:
 If you run into an error (like a rate limit or "model not found"), just use the dropdown menu to switch the AI model (e.g., try Gemini 3.5 Flash or Gemini 2.5 Flash) and try again.
