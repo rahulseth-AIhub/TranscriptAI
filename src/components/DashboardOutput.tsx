@@ -26,7 +26,8 @@ import {
   Target,
   Activity,
   Award,
-  BookmarkCheck
+  BookmarkCheck,
+  Trash2
 } from "lucide-react";
 
 interface DashboardOutputProps {
@@ -89,6 +90,13 @@ export default function DashboardOutput({
       }
       return item;
     });
+    onUpdateActionItems(updated);
+  };
+
+  // Delete checklist item
+  const handleDeleteAction = (id: string, e: MouseEvent) => {
+    e.stopPropagation();
+    const updated = data.actionItems.filter((item) => item.id !== id);
     onUpdateActionItems(updated);
   };
 
@@ -284,8 +292,10 @@ export default function DashboardOutput({
           <div className="flex flex-col gap-0.5 px-3 py-1 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-lg">
             <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Blocked/Risks</span>
             <div className="flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-rose-500" />
-              <span className="text-sm font-extrabold text-zinc-950 dark:text-zinc-100">{data.decisionsRisks.risks.length} Flagged</span>
+              <ShieldAlert className={`h-4 w-4 ${data.decisionsRisks.risks.length > 0 ? "text-rose-500" : "text-emerald-500"}`} />
+              <span className="text-sm font-extrabold text-zinc-950 dark:text-zinc-100">
+                {data.decisionsRisks.risks.length === 0 ? "None" : `${data.decisionsRisks.risks.length} Flagged`}
+              </span>
             </div>
           </div>
         </div>
@@ -503,6 +513,16 @@ export default function DashboardOutput({
                         </span>
                       </div>
                     </div>
+
+                    {/* Delete Action Item Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteAction(item.id, e)}
+                      className="shrink-0 text-zinc-400 hover:text-red-500 dark:hover:text-red-405 p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none cursor-pointer"
+                      title="Remove task from matrix"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))
               ) : (
@@ -588,10 +608,20 @@ export default function DashboardOutput({
           </div>
 
           {/* Risks & Blockers Bento Col */}
-          <div className="flex flex-col gap-3 p-5 border border-rose-100/70 dark:border-rose-900/35 rounded-2xl bg-rose-50/15 dark:bg-rose-950/10 shadow-2xs">
-            <h4 className="text-sm font-extrabold text-rose-800 dark:text-rose-400 uppercase tracking-widest flex items-center gap-2 select-none">
-              <span className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/30">
-                <ShieldAlert className="h-4 w-4 text-rose-650 dark:text-rose-455" />
+          <div className={`flex flex-col gap-3 p-5 border rounded-2xl shadow-2xs transition-colors ${
+            data.decisionsRisks.risks.length > 0 
+              ? "border-rose-100/70 dark:border-rose-900/35 bg-rose-50/15 dark:bg-rose-950/10" 
+              : "border-emerald-100/40 dark:border-emerald-900/15 bg-emerald-50/10 dark:bg-emerald-950/5"
+          }`}>
+            <h4 className={`text-sm font-extrabold uppercase tracking-widest flex items-center gap-2 select-none ${
+              data.decisionsRisks.risks.length > 0 ? "text-rose-800 dark:text-rose-400" : "text-emerald-800 dark:text-emerald-400"
+            }`}>
+              <span className={`p-1 rounded-lg ${
+                data.decisionsRisks.risks.length > 0 ? "bg-rose-50 dark:bg-rose-950/30" : "bg-emerald-50 dark:bg-emerald-950/30"
+              }`}>
+                <ShieldAlert className={`h-4 w-4 ${
+                  data.decisionsRisks.risks.length > 0 ? "text-rose-650 dark:text-rose-455" : "text-emerald-600 dark:text-emerald-450"
+                }`} />
               </span>
               Blockers & Vulnerabilities
             </h4>
@@ -607,7 +637,9 @@ export default function DashboardOutput({
                   </li>
                 ))
               ) : (
-                <span className="text-xs text-zinc-400 dark:text-zinc-550">N/A</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-sans font-medium italic">
+                  🎉 No blockers or risks flagged. Excellent meeting alignment!
+                </span>
               )}
             </ul>
           </div>

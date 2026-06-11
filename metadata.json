@@ -2,7 +2,8 @@
   "name": "TranscriptAI",
   "description": "Process raw meeting transcripts and audio files into highly structured, professional, and actionable meeting notes.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "display-capture"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

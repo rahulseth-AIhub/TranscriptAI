@@ -12,10 +12,30 @@ import {
   Layout,
   Code,
   Sun,
-  Moon
+  Moon,
+  Key,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import ActiveMeetingRoom from "./components/ActiveMeetingRoom";
 import { CalendarEvent } from "./firebase_client";
+
+export const PROVIDER_MODELS = {
+  google: [
+    { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", desc: "Balanced intelligence & speed (Recommended)" },
+    { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (Preview)", desc: "High reasoning, complex terminology" },
+    { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash-Lite", desc: "Basic tracking, ultra fast" }
+  ],
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o", desc: "Premium intelligence & summary structure" },
+    { id: "gpt-4o-mini", name: "GPT-4o Mini", desc: "Lightning fast, concise bullet points" },
+    { id: "o1-mini", name: "o1-mini", desc: "Expert logical mapping for long transcripts" }
+  ],
+  anthropic: [
+    { id: "claude-3-5-sonnet-latest", name: "Claude 3.5 Sonnet", desc: "Elite articulation, human-like alignment" },
+    { id: "claude-3-5-haiku-latest", name: "Claude 3.5 Haiku", desc: "Rapid processing, outstanding action logs" }
+  ]
+};
 
 export default function App() {
   const [markdownOutput, setMarkdownOutput] = useState<string>("");
@@ -24,6 +44,72 @@ export default function App() {
   const [activeViewMode, setActiveViewMode] = useState<"interactive" | "raw">("interactive");
   const [activeMeeting, setActiveMeeting] = useState<CalendarEvent | null>(null);
   const [isOfflineFallback, setIsOfflineFallback] = useState<boolean>(false);
+
+  // Model Selection & Key config
+  const [selectedProvider, setSelectedProvider] = useState<"google" | "openai" | "anthropic">(() => {
+    return (localStorage.getItem("transcribe_selected_provider") as any) || "google";
+  });
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem("transcribe_selected_model") || "gemini-3.5-flash";
+  });
+
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem("user_gemini_api_key") || "";
+  });
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>(() => {
+    return localStorage.getItem("user_openai_api_key") || "";
+  });
+  const [anthropicApiKey, setAnthropicApiKey] = useState<string>(() => {
+    return localStorage.getItem("user_anthropic_api_key") || "";
+  });
+
+  const [isApiKeyOpen, setIsApiKeyOpen] = useState<boolean>(false);
+  const [showKeyText, setShowKeyText] = useState<boolean>(false);
+
+  // Backward compatibility alias
+  const customApiKey = geminiApiKey;
+
+  const handleSaveGeminiKey = (key: string) => {
+    const trimmed = key.trim();
+    setGeminiApiKey(trimmed);
+    if (trimmed) localStorage.setItem("user_gemini_api_key", trimmed);
+    else localStorage.removeItem("user_gemini_api_key");
+  };
+
+  const handleSaveOpenaiKey = (key: string) => {
+    const trimmed = key.trim();
+    setOpenaiApiKey(trimmed);
+    if (trimmed) localStorage.setItem("user_openai_api_key", trimmed);
+    else localStorage.removeItem("user_openai_api_key");
+  };
+
+  const handleSaveAnthropicKey = (key: string) => {
+    const trimmed = key.trim();
+    setAnthropicApiKey(trimmed);
+    if (trimmed) localStorage.setItem("user_anthropic_api_key", trimmed);
+    else localStorage.removeItem("user_anthropic_api_key");
+  };
+
+  const handleProviderChange = (provider: "google" | "openai" | "anthropic") => {
+    setSelectedProvider(provider);
+    localStorage.setItem("transcribe_selected_provider", provider);
+    
+    const defaultModel = PROVIDER_MODELS[provider][0].id;
+    setSelectedModel(defaultModel);
+    localStorage.setItem("transcribe_selected_model", defaultModel);
+  };
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    localStorage.setItem("transcribe_selected_model", model);
+  };
+
+  const hasActiveKey = () => {
+    if (selectedProvider === "google") return !!geminiApiKey;
+    if (selectedProvider === "openai") return !!openaiApiKey;
+    if (selectedProvider === "anthropic") return !!anthropicApiKey;
+    return false;
+  };
 
   // Load initial theme state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -47,28 +133,28 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Load state from localStorage if exists
+  // Load state from sessionStorage if exists
   useEffect(() => {
-    const savedMarkdown = localStorage.getItem("transcript_ai_markdown");
+    const savedMarkdown = sessionStorage.getItem("transcript_ai_markdown");
     if (savedMarkdown) {
       setMarkdownOutput(savedMarkdown);
     }
-    const savedFallback = localStorage.getItem("transcript_ai_offline_fallback");
+    const savedFallback = sessionStorage.getItem("transcript_ai_offline_fallback");
     if (savedFallback) {
       setIsOfflineFallback(savedFallback === "true");
     }
   }, []);
 
-  // Update localStorage when markdown changes
+  // Update sessionStorage when markdown changes
   const saveMarkdown = (md: string, offlineFlag: boolean = false) => {
     setMarkdownOutput(md);
     setIsOfflineFallback(offlineFlag);
     if (md) {
-      localStorage.setItem("transcript_ai_markdown", md);
-      localStorage.setItem("transcript_ai_offline_fallback", String(offlineFlag));
+      sessionStorage.setItem("transcript_ai_markdown", md);
+      sessionStorage.setItem("transcript_ai_offline_fallback", String(offlineFlag));
     } else {
-      localStorage.removeItem("transcript_ai_markdown");
-      localStorage.removeItem("transcript_ai_offline_fallback");
+      sessionStorage.removeItem("transcript_ai_markdown");
+      sessionStorage.removeItem("transcript_ai_offline_fallback");
     }
   };
 
@@ -77,22 +163,55 @@ export default function App() {
 
   // Sync state modifications from checklist or added actions back into the markdown text representation
   const handleUpdateActionItems = (newActions: ActionItem[]) => {
-    // Reconstruct the Checklist section text starting under ## ✅ Action Items & Ownership
+    // Reconstruct the Checklist section text starting under Action Items & Ownership
     const lines = markdownOutput.split("\n");
     let startIndex = -1;
     let endIndex = -1;
 
+    // Robust heading check logic matching any level of markdown header and optional symbols
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes("## ✅ Action Items & Ownership")) {
+      const line = lines[i].toLowerCase().trim();
+      if (
+        (line.includes("action items") && line.includes("ownership")) ||
+        (line.includes("✅") && line.includes("action") && line.includes("item"))
+      ) {
         startIndex = i + 1;
         break;
       }
     }
 
+    // Helper to identify where the next major section block starts
+    const isNextSectionHeader = (lineText: string): boolean => {
+      const clean = lineText.trim();
+      if (clean.startsWith("#")) return true;
+      if (
+        clean.startsWith("📌") ||
+        clean.startsWith("📝") ||
+        clean.startsWith("🔑") ||
+        clean.startsWith("✅") ||
+        clean.startsWith("💡") ||
+        clean.startsWith("⏳")
+      ) {
+        return true;
+      }
+      const upper = clean.toUpperCase();
+      return (
+        upper.includes("MEETING METADATA") ||
+        upper.includes("EXECUTIVE SUMMARY") ||
+        upper.includes("KEY DISCUSSION PILLARS") ||
+        upper.includes("ACTION ITEMS") ||
+        upper.includes("DECISIONS, BLOCKS") ||
+        upper.includes("DECISIONS, BOXES") ||
+        upper.includes("DECISIONS AND RISKS") ||
+        upper.includes("QUICK-REFERENCE TIMELINE") ||
+        upper.includes("TIMELINE")
+      );
+    };
+
     if (startIndex !== -1) {
       // Find where next main section starts or end of lines
       for (let j = startIndex; j < lines.length; j++) {
-        if (lines[j].startsWith("## ")) {
+        if (isNextSectionHeader(lines[j])) {
           endIndex = j;
           break;
         }
@@ -110,17 +229,39 @@ export default function App() {
       const updatedMarkdown = `${beforeStr}\n${replacementLines.join("\n")}\n\n${afterStr}`.replace(/\n\n\n+/g, "\n\n");
       
       saveMarkdown(updatedMarkdown, isOfflineFallback);
+    } else {
+      // Fallback: If no Actions section header was found, append a new header and the list to the end
+      const replacementLines = newActions.map(
+        (item) => `* [${item.completed ? "x" : " "}] **${item.owner}**: ${item.task}`
+      );
+      const newSection = `\n\n✅ Action Items & Ownership\n${replacementLines.join("\n")}\n`;
+      saveMarkdown(markdownOutput + newSection, isOfflineFallback);
     }
   };
 
   // Submit Text Transcript API
   const handleAnalyzeText = async (text: string, titleHint: string) => {
+    if (!hasActiveKey()) {
+      const providerName = selectedProvider === "google" ? "Google Gemini" : selectedProvider === "openai" ? "OpenAI" : "Anthropic Claude";
+      setApiError(`A personal ${providerName} API Key is required. Please click the pulsating model settings button at the top-right to configure your key.`);
+      setIsApiKeyOpen(true);
+      return;
+    }
     setIsLoading(true);
     setApiError(null);
     try {
+      const headers: Record<string, string> = { 
+        "Content-Type": "application/json",
+        "x-provider": selectedProvider,
+        "x-model": selectedModel,
+        "x-gemini-api-key": geminiApiKey || "",
+        "x-openai-api-key": openaiApiKey || "",
+        "x-anthropic-api-key": anthropicApiKey || ""
+      };
+
       const resp = await fetch("/api/summarize-text", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ text, titleSuggestion: titleHint }),
       });
 
@@ -151,12 +292,27 @@ export default function App() {
     filename: string,
     titleHint: string
   ) => {
+    if (!hasActiveKey()) {
+      const providerName = selectedProvider === "google" ? "Google Gemini" : selectedProvider === "openai" ? "OpenAI" : "Anthropic Claude";
+      setApiError(`A personal ${providerName} API Key is required. Please click the pulsating model settings button at the top-right to configure your key.`);
+      setIsApiKeyOpen(true);
+      return;
+    }
     setIsLoading(true);
     setApiError(null);
     try {
+      const headers: Record<string, string> = { 
+        "Content-Type": "application/json",
+        "x-provider": selectedProvider,
+        "x-model": selectedModel,
+        "x-gemini-api-key": geminiApiKey || "",
+        "x-openai-api-key": openaiApiKey || "",
+        "x-anthropic-api-key": anthropicApiKey || ""
+      };
+
       const resp = await fetch("/api/summarize-audio", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ base64Data, mimeType, filename, titleSuggestion: titleHint }),
       });
 
@@ -315,6 +471,140 @@ export default function App() {
  
         {/* Action bar featuring Theme Switcher & System Reset */}
         <div className="flex items-center gap-3">
+          {/* Multi-Model and API Key Config Popover */}
+          <div className="relative">
+            <button
+              onClick={() => setIsApiKeyOpen(!isApiKeyOpen)}
+              className={`flex items-center gap-1.5 h-9 px-3 border rounded-xl font-semibold text-xs transition-all shadow-xs ${
+                hasActiveKey()
+                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/25 dark:text-emerald-400"
+                  : "border-amber-300 bg-amber-50/50 text-amber-800 hover:bg-amber-100 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:bg-amber-950/40 animate-pulse"
+              }`}
+              title="Configure Models and personal API Keys"
+              id="model-config-panel-btn"
+            >
+              <Sparkles className="h-4 w-4 text-indigo-500 animate-spin-slow" />
+              <span className="hidden sm:inline">
+                {PROVIDER_MODELS[selectedProvider].find(m => m.id === selectedModel)?.name || "Select Model"}
+              </span>
+              {hasActiveKey() && (
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+              )}
+            </button>
+
+            {isApiKeyOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl z-50 animate-fade-in transition-colors duration-200">
+                <div className="flex flex-col gap-4">
+                  {/* Popover Header */}
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900 pb-2">
+                    <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-indigo-500" />
+                      Model Configuration
+                    </h3>
+                    <button
+                      onClick={() => setIsApiKeyOpen(false)}
+                      className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Provider Tabs selector */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">AI PROVIDER</label>
+                    <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
+                      {(["google", "openai", "anthropic"] as const).map((prov) => (
+                        <button
+                          key={prov}
+                          onClick={() => handleProviderChange(prov)}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold capitalize transition-all ${
+                            selectedProvider === prov
+                              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-xs border border-zinc-200/50 dark:border-zinc-700/50"
+                              : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                          }`}
+                        >
+                          {prov === "google" ? "Gemini" : prov === "openai" ? "OpenAI" : "Claude"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Model Selector dropdown */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">SELECT MODEL</label>
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => handleModelChange(e.target.value)}
+                      className="w-full text-xs py-2 px-3 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-lg text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:border-indigo-500 font-medium transition-all"
+                    >
+                      {PROVIDER_MODELS[selectedProvider].map((mod) => (
+                        <option key={mod.id} value={mod.id}>
+                          {mod.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal italic bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/40">
+                      {PROVIDER_MODELS[selectedProvider].find(m => m.id === selectedModel)?.desc}
+                    </p>
+                  </div>
+
+                  {/* API Key management panel for selected Provider */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                      {selectedProvider === "google" ? "GEMINI API KEY" : selectedProvider === "openai" ? "OPENAI API KEY" : "CLAUDE API KEY"}
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type={showKeyText ? "text" : "password"}
+                        placeholder={
+                          selectedProvider === "google"
+                            ? "AIzaSy..."
+                            : selectedProvider === "openai"
+                            ? "sk-..."
+                            : "sk-ant-..."
+                        }
+                        value={
+                          selectedProvider === "google"
+                            ? geminiApiKey
+                            : selectedProvider === "openai"
+                            ? openaiApiKey
+                            : anthropicApiKey
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (selectedProvider === "google") handleSaveGeminiKey(val);
+                          else if (selectedProvider === "openai") handleSaveOpenaiKey(val);
+                          else handleSaveAnthropicKey(val);
+                        }}
+                        className="w-full text-xs py-2 pl-3 pr-10 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-lg focus:outline-hidden focus:border-indigo-500 text-zinc-900 dark:text-zinc-100 font-mono transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyText(!showKeyText)}
+                        className="absolute right-2 text-zinc-400 hover:text-zinc-655"
+                      >
+                        {showKeyText ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <span className="text-[9px] text-zinc-400 dark:text-zinc-500 leading-normal">
+                      Keys are stored securely in browser local storage and never leave your client context.
+                    </span>
+                  </div>
+
+                  {/* Close panel action */}
+                  <div className="flex gap-2 justify-end border-t border-zinc-100 dark:border-zinc-900 pt-3">
+                    <button
+                      onClick={() => setIsApiKeyOpen(false)}
+                      className="py-1.5 px-4 bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+                    >
+                      Done Config
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="flex items-center justify-center w-9 h-9 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-black text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all shadow-xs"

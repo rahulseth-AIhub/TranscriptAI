@@ -40,6 +40,7 @@ export default function SidebarInputs({
 
   // Record / Upload states
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSource, setRecordingSource] = useState<"mic" | "system">("mic");
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export default function SidebarInputs({
   const wordCount = pasteText.trim() ? pasteText.trim().split(/\s+/).length : 0;
   const charCount = pasteText.length;
 
-  // Start recording mic
+  // Start recording
   const startRecording = async () => {
     audioChunksRef.current = [];
     setAudioBlob(null);
@@ -75,7 +76,36 @@ export default function SidebarInputs({
     setFileBase64(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+      if (recordingSource === "system") {
+        // Request container audio via display/tab capture API
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+        
+        const audioTracks = displayStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          displayStream.getTracks().forEach((track) => track.stop());
+          alert("No system/tab audio channel shared. When sharing your browser tab or window, you MUST toggle 'Share tab audio' or 'Share system audio' on so TranscriptAI can capture the conversation.");
+          return;
+        }
+
+        // Keep only the audio stream track
+        stream = new MediaStream([audioTracks[0]]);
+        
+        // Let chrome's native 'Stop sharing' bar stop the recording safely
+        audioTracks[0].onended = () => {
+          stopRecording();
+        };
+
+        // Shut down video stream tracks to avoid browser displaying video alerts
+        displayStream.getVideoTracks().forEach((track) => track.stop());
+      } else {
+        // Request physical microphone
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = mediaRecorder;
 
@@ -113,9 +143,23 @@ export default function SidebarInputs({
       timerIntervalRef.current = setInterval(() => {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
-    } catch (err) {
-      console.error("Failed to access microphone:", err);
-      alert("Microphone access denied or unsupported format. Please enable permission.");
+    } catch (err: any) {
+      console.error("Failed to start recording channel:", err);
+      const errMsg = err?.message || "";
+      if (
+        err?.name === "NotAllowedError" || 
+        errMsg.includes("permission") || 
+        errMsg.includes("disallowed") || 
+        errMsg.includes("policy")
+      ) {
+        alert(
+          "⚠️ Audio Channel Recording Restricted in Preview Frame\n\n" +
+          "Standard sandbox browsers frequently disallow tab/screen audio capture inside nested iframe windows.\n\n" +
+          "👉 Solution: Click the 'Open in New Tab' button in the top-right corner of the development interface to load TranscriptAI in a fullscreen layout! Once opened in its own tab, system audio and headphone session capturing will work perfectly."
+        );
+      } else {
+        alert("Failed to initialize selected recording channel. Make sure you granted browser permissions or checked the 'Share tab audio' checkbox during tab selection.");
+      }
     }
   };
 
@@ -131,11 +175,23 @@ export default function SidebarInputs({
   };
 
   const handleDownloadAudio = () => {
-    if (audioUrl) {
+    if (audioChunksRef.current.length > 0) {
+      // Package the recorded signal chunks as an audio/mp3 direct blob for maximum compatibility with devices expecting .mp3 extensions
+      const mp3Blob = new Blob(audioChunksRef.current, { type: "audio/mp3" });
+      const downloadUrl = URL.createObjectURL(mp3Blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      const cleanTitle = titleHint.trim() ? titleHint.trim().replace(/[^a-zA-Z0-9]/g, "_") : "recorded_session";
+      a.download = `${cleanTitle}_${new Date().toISOString().replace(/[:.]/g, "-")}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+    } else if (audioUrl) {
       const a = document.createElement("a");
       a.href = audioUrl;
       const cleanTitle = titleHint.trim() ? titleHint.trim().replace(/[^a-zA-Z0-9]/g, "_") : "recorded_session";
-      a.download = `${cleanTitle}_${new Date().toISOString().replace(/[:.]/g, "-")}.webm`;
+      a.download = `${cleanTitle}_${new Date().toISOString().replace(/[:.]/g, "-")}.mp3`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -344,12 +400,49 @@ export default function SidebarInputs({
             <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-900/40">
               <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Option A: Live Voice Recorder</span>
               
+              {/* Recording Source Toggle Selector */}
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg w-full max-w-[250px] border border-zinc-200/55 dark:border-zinc-700/60 font-sans">
+                <button
+                  type="button"
+                  onClick={() => setRecordingSource("mic")}
+                  disabled={isRecording}
+                  className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition-all ${
+                    recordingSource === "mic"
+                      ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-xs border border-zinc-200/50"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 disabled:opacity-55"
+                  }`}
+                >
+                  🎙️ Mic Source
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecordingSource("system")}
+                  disabled={isRecording}
+                  className={`flex-1 py-1 px-2 text-[10px] font-bold rounded-md transition-all ${
+                    recordingSource === "system"
+                      ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-xs border border-zinc-200/50"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 disabled:opacity-55"
+                  }`}
+                  title="Records system audio / virtual tab output directly - great for using headphones!"
+                >
+                  🖥️ Audio Channel
+                </button>
+              </div>
+
+              {!isRecording && (
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center leading-normal max-w-[240px]">
+                  {recordingSource === "mic" 
+                    ? "Records physical audio via your device microphone." 
+                    : "Captures computer/tab output (e.g., meeting audio) so you can safely use headphones. *Be sure to select 'Share audio' in the selector dialogue!"}
+                </p>
+              )}
+
               {isRecording ? (
                 <div className="flex flex-col items-center gap-2">
                   {/* Glowing record indicator */}
                   <div className="flex items-center gap-2 py-1 px-3 bg-red-50 dark:bg-red-950/25 text-red-600 dark:text-red-400 rounded-full text-xs font-mono animate-pulse border border-red-150 dark:border-red-900/30">
                     <div className="h-2 w-2 rounded-full bg-red-600"></div>
-                    RECORDING LIVE • {formatTime(recordingDuration)}
+                    {recordingSource === "system" ? "RECORDING SYSTEM AUDIO" : "RECORDING MIC"} • {formatTime(recordingDuration)}
                   </div>
                   
                   {/* Recording wave visual representation */}
@@ -397,7 +490,7 @@ export default function SidebarInputs({
                     onClick={handleDownloadAudio}
                     className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 mt-1 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-100 dark:border-indigo-900/40 text-indigo-700 dark:text-indigo-400 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
                   >
-                    <Download className="h-3.5 w-3.5" /> Download Recorded Audio (.webm)
+                    <Download className="h-3.5 w-3.5" /> Download Recorded Audio (.mp3)
                   </button>
                 </div>
               )}

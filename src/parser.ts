@@ -211,6 +211,41 @@ export function parseMeetingMarkdown(markdown: string): ParsedMinutes {
     }
   });
 
+  // Helper to identify negative/placeholder values (like "N/A", "None", or "No risks") that do not represent real risks/decisions
+  const isNegativeValue = (val: string): boolean => {
+    const clean = val.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    if (!clean) return true;
+    return (
+      clean === "na" ||
+      clean === "none" ||
+      clean === "nil" ||
+      clean === "no" ||
+      clean === "not applicable" ||
+      clean === "not available" ||
+      clean === "no risks" ||
+      clean === "no blockers" ||
+      clean === "no major risks" ||
+      clean === "no major blockers" ||
+      clean === "no risks identified" ||
+      clean === "no blockers identified" ||
+      clean === "no risks or blockers" ||
+      clean === "no blockers or risks" ||
+      clean === "no major risks or blockers identified" ||
+      clean === "no major blockers or risks identified" ||
+      clean === "no blockers or risks identified" ||
+      clean === "no risks or blockers identified" ||
+      clean === "no risks or blockers present" ||
+      clean.startsWith("no major risks") ||
+      clean.startsWith("no risks") ||
+      clean.startsWith("no blockers") ||
+      clean.startsWith("no blockers or risks") ||
+      clean.startsWith("no risks or blockers")
+    );
+  };
+
+  result.decisionsRisks.decisions = result.decisionsRisks.decisions.filter(d => !isNegativeValue(d));
+  result.decisionsRisks.risks = result.decisionsRisks.risks.filter(r => !isNegativeValue(r));
+
   // If we ended up with nothing because formatting differed, provide default fallbacks
   if (result.metadata.topic === "N/A" && result.pillars.length === 0) {
     // Attempt relaxed parsing or pre-fill raw view
